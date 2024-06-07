@@ -1,5 +1,5 @@
-let camera, scene, renderer;
-let cubes = [];
+let userCameraP, totalScene, finalRenderer;
+let allCubes = [];
 let mouseX = 0, mouseY = 0;
 let windowHalfX = window.innerWidth / 2;
 let windowHalfY = window.innerHeight / 2;
@@ -9,48 +9,65 @@ init();
 animate();
 
 function init() {
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.z = 5000;
+    /*
+    70 degree view and an aspect ratio to fit screen
+     */
+    userCameraP = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
+    userCameraP.position.z = 5000;
+    // For a different POV:
+    // userCameraP.position.y = 1000;
+    totalScene = new THREE.Scene();
 
-    scene = new THREE.Scene();
+    // floor maker material/geometry
+    const GeoFloor = new THREE.PlaneGeometry(10000, 10000);
+    const GeoMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const FinalFloor = new THREE.Mesh(GeoFloor, GeoMat);
+    /*
+    Line below rotates base to be on the ground not as a wall
+    && pushed 1000 down to be a floor not a ceiling
+     */
+    FinalFloor.rotation.x = Math.PI / 2;
+    FinalFloor.position.y = -1000;
+    FinalFloor.receiveShadow = true;
+    totalScene.add(FinalFloor);
 
-    // Create floor
-    const floorGeometry = new THREE.PlaneGeometry(10000, 10000);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = Math.PI / 2;
-    floor.position.y = -1000;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    // make a cube geometry
+    const boxGeometry = new THREE.BoxGeometry(200, 200, 200);
 
-    const geometry = new THREE.BoxGeometry(200, 200, 200);
-
-    for (let i = 0; i < 12; i++) {
+    // cubes must be random colors/starting heights, random rotation speeds, etc.
+    for (let i = 0; i < 120; i++) {
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.width = 512;
         canvas.height = 512;
-        const color = getRandomColor();
+        const color = RandomColorMaker();
         context.fillStyle = color;
         context.fillRect(0, 0, canvas.width, canvas.height);
 
-        const texture = new THREE.CanvasTexture(canvas);
-        const material = new THREE.MeshStandardMaterial({ map: texture });
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.x = Math.random() * 8000 - 4000;
-        cube.position.y = Math.random() * 4000;
-        cube.position.z = Math.random() * 8000 - 4000;
-        cube.castShadow = true;
-        scene.add(cube);
-        cubes.push({ mesh: cube, rotationSpeed: Math.random() * 0.05 - 0.025, color: color, velocityY: 0 });
+
+        const CubeText = new THREE.CanvasTexture(canvas);
+        const CubeMat = new THREE.MeshStandardMaterial({ map: CubeText });
+        const FinalCube = new THREE.Mesh(boxGeometry, CubeMat);
+
+
+        FinalCube.position.x = Math.random() * 8000 - 4000;
+        FinalCube.position.y = Math.random() * 4000;
+        FinalCube.position.z = Math.random() * 8000 - 4000;
+        FinalCube.castShadow = true;
+        totalScene.add(FinalCube);
+
+        // add the cube to the cubes array with rotation speed and velocityY
+        allCubes.push({ mesh: FinalCube, rotationSpeed: Math.random() * 0.05 - 0.025, color: color, velocityY: 0 });
     }
 
+    // light source
     light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(0, 4000, 2000); // Fixed position for the light
+    // light position
+    light.position.set(0, 4000, 2000);
     light.castShadow = true;
     light.shadow.mapSize.width = 1024;
     light.shadow.mapSize.height = 1024;
-    scene.add(light);
+    totalScene.add(light);
 
     light.shadow.camera.near = 0.5;
     light.shadow.camera.far = 10000;
@@ -59,17 +76,17 @@ function init() {
     light.shadow.camera.top = 5000;
     light.shadow.camera.bottom = -5000;
 
-    scene.add(new THREE.AmbientLight(0x404040));
+    totalScene.add(new THREE.AmbientLight(0x404040));
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
+    finalRenderer = new THREE.WebGLRenderer({ antialias: true });
+    finalRenderer.setSize(window.innerWidth, window.innerHeight);
+    finalRenderer.shadowMap.enabled = true;
+    document.body.appendChild(finalRenderer.domElement);
 
     window.addEventListener('resize', onWindowResize);
 }
 
-function getRandomColor() {
+function RandomColorMaker() {
     const letters = '0123456789ABCDEF';
     let color = '#';
     for (let i = 0; i < 6; i++) {
@@ -82,36 +99,42 @@ function onWindowResize() {
     windowHalfX = window.innerWidth / 2;
     windowHalfY = window.innerHeight / 2;
 
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    userCameraP.aspect = window.innerWidth / window.innerHeight;
+    userCameraP.updateProjectionMatrix();
 
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    finalRenderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function animate() {
     requestAnimationFrame(animate);
+    for (let i = 0; i < allCubes.length; i++) {
+        const cube = allCubes[i].mesh;
+        /*
+        gravity effect
+         ## -> speed ## cubes[i].velocityY -= 0.1;
+         */
+        allCubes[i].velocityY -= 0.1;
+        cube.position.y += allCubes[i].velocityY;
 
-    for (let i = 0; i < cubes.length; i++) {
-        const cube = cubes[i].mesh;
-
-        // Apply gravity
-        cubes[i].velocityY -= 0.1;
-        cube.position.y += cubes[i].velocityY;
-
-        // Check collision with the floor
+        /*
+        if( hits floor){
+            reverse velocity with some energy loss for bounce effect
+            - cubes[i].velocityY *= -0.8;
+        }
+         */
         if (cube.position.y < -800) {
-            cube.position.y = -800; // Bounce off the floor
-            cubes[i].velocityY *= -0.8; // Reverse velocity with some loss
+            cube.position.y = -800;
+            allCubes[i].velocityY *= -0.8;
         }
 
-        // Add rotation to the cubes
-        cube.rotation.x += cubes[i].rotationSpeed;
-        cube.rotation.y += cubes[i].rotationSpeed;
+        // cube spinny spin
+        cube.rotation.x += allCubes[i].rotationSpeed;
+        cube.rotation.y += allCubes[i].rotationSpeed;
     }
 
     render();
 }
 
 function render() {
-    renderer.render(scene, camera);
+    finalRenderer.render(totalScene, userCameraP);
 }
