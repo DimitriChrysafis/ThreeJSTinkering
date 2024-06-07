@@ -1,2 +1,4 @@
 # ThreeJSTinkering
 Teeheeeeeee
+
+![](example.gif)
